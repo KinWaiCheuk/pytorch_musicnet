@@ -1,1 +1,6 @@
 data
+three-layer-e2e-prior.ipynb
+three-layer-e2e-sin+cos.ipynb
+.ipynb_checkpoints/
+weights/three-layer-e2e-sin+cos
+weights/translation_invariant_morelvl3 

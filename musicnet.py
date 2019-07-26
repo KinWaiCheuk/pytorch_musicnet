@@ -372,13 +372,14 @@ def create_filters(n_fft, freq_bins=None, low=50,high=6000, sr=44100, freq_scale
     
     return wsin,wcos
 
-
 def get_mir_accuracy(Yhat, Y_true, threshold=0.4, m=128):
+    if isinstance(Yhat, torch.Tensor):
+        Yhat = Yhat.cpu().numpy()
     Yhatlist = []
     Ylist = []
     Yhatpred = Yhat>threshold
+    print(f"Calculating accuracy ...", end = '\r')
     for i in range(len(Yhatpred)):
-        print(f"{i}/{len(Yhatpred)} batches", end = '\r')
         fhat = []
         f = []
         for note in range(m):
@@ -390,12 +391,12 @@ def get_mir_accuracy(Yhat, Y_true, threshold=0.4, m=128):
 
         Yhatlist.append(np.array(fhat))
         Ylist.append(np.array(f))
-    avp = average_precision_score(Y_true.flatten(),Yhat.detach().cpu().flatten())
+    avp = average_precision_score(Y_true.flatten(),Yhat.flatten())
     P,R,Acc,Esub,Emiss,Efa,Etot,cP,cR,cAcc,cEsub,cEmiss,cEfa,cEtot = \
     mir_eval.multipitch.metrics(np.arange(len(Ylist))/100.,Ylist,np.arange(len(Yhatlist))/100.,Yhatlist)
     print('{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}'.format(100*avp,100*P,100*R,Acc,Etot,Esub,Emiss,Efa))
     return avp,P,R,Acc,Etot
-def get_piano_roll(rec_id, test_set, model, window=16384, stride=1000, offset=44100, count=7500, batch_size=500, m=128):
+def get_piano_roll(rec_id, test_set, model, device, window=16384, stride=1000, offset=44100, count=7500, batch_size=500, m=128):
     sf=4
     if stride == -1:
         stride = (test_set.records[rec_id][1] - offset - int(sf*window))/(count-1)
@@ -409,11 +410,58 @@ def get_piano_roll(rec_id, test_set, model, window=16384, stride=1000, offset=44
         
     for i in range(count):
         X[i,:], Y[i] =  test_set.access(rec_id, offset+i*stride)
-        
-    Y_pred = torch.zeros([count,m])
-    for i in range(len(X)//batch_size):
-        X_batch = torch.tensor(X[batch_size*i:batch_size*(i+1)]).float().cuda()   
-        Y_pred[batch_size*i:batch_size*(i+1)] = model(X_batch)
+    
+    with torch.no_grad():
+        Y_pred = torch.zeros([count,m])
+        for i in range(len(X)//batch_size):
+            print(f"{i}/{(len(X)//batch_size)} batches", end = '\r')
+            X_batch = torch.tensor(X[batch_size*i:batch_size*(i+1)]).float().to(device)
+            Y_pred[batch_size*i:batch_size*(i+1)] = model(X_batch).cpu()
     
     return Y_pred, Y
+
+
+# def get_mir_accuracy(Yhat, Y_true, threshold=0.4, m=128):
+#     Yhatlist = []
+#     Ylist = []
+#     Yhatpred = Yhat>threshold
+#     for i in range(len(Yhatpred)):
+#         print(f"{i}/{len(Yhatpred)} batches", end = '\r')
+#         fhat = []
+#         f = []
+#         for note in range(m):
+#             if Yhatpred[i][note] == 1:
+#                 fhat.append(440.*2**(((note)-69.)/12.))
+
+#             if Y_true[i][note] == 1:
+#                 f.append(440.*2**(((note)-69.)/12.))
+
+#         Yhatlist.append(np.array(fhat))
+#         Ylist.append(np.array(f))
+#     avp = average_precision_score(Y_true.flatten(),Yhat.detach().cpu().flatten())
+#     P,R,Acc,Esub,Emiss,Efa,Etot,cP,cR,cAcc,cEsub,cEmiss,cEfa,cEtot = \
+#     mir_eval.multipitch.metrics(np.arange(len(Ylist))/100.,Ylist,np.arange(len(Yhatlist))/100.,Yhatlist)
+#     print('{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}\t{:.2f}'.format(100*avp,100*P,100*R,Acc,Etot,Esub,Emiss,Efa))
+#     return avp,P,R,Acc,Etot
+# def get_piano_roll(rec_id, test_set, model, window=16384, stride=1000, offset=44100, count=7500, batch_size=500, m=128):
+#     sf=4
+#     if stride == -1:
+#         stride = (test_set.records[rec_id][1] - offset - int(sf*window))/(count-1)
+#         stride = int(stride)
+#     else:
+#         count = (test_set.records[rec_id][1] - offset - int(sf*window))/stride + 1
+#         count = int(count)
+        
+#     X = np.zeros([count, window])
+#     Y = np.zeros([count, m])    
+        
+#     for i in range(count):
+#         X[i,:], Y[i] =  test_set.access(rec_id, offset+i*stride)
+        
+#     Y_pred = torch.zeros([count,m])
+#     for i in range(len(X)//batch_size):
+#         X_batch = torch.tensor(X[batch_size*i:batch_size*(i+1)]).float().cuda()   
+#         Y_pred[batch_size*i:batch_size*(i+1)] = model(X_batch)
+    
+#     return Y_pred, Y
     
