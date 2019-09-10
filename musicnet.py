@@ -357,10 +357,11 @@ def create_filters(n_fft, freq_bins=None, low=50,high=6000, sr=44100, freq_scale
         
     if freq_scale == 'linear':
         start_bin = start_freq*n_fft/sr
-        scaling_ind = (end_freq/start_freq)/freq_bins
+        scaling_ind = (end_freq-start_freq)/freq_bins*(n_fft/sr)
         for k in range(freq_bins): # Only half of the bins contain useful info
-            wsin[k,0,:] = window_mask*np.sin(2*np.pi*(k*scaling_ind*start_bin)*s/n_fft)
-            wcos[k,0,:] = window_mask*np.cos(2*np.pi*(k*scaling_ind*start_bin)*s/n_fft)
+            print("linear freq = {}".format(k*scaling_ind*start_bin))
+            wsin[k,0,:] = window_mask*np.sin(2*np.pi*(k*scaling_ind+start_bin)*s/n_fft)
+            wcos[k,0,:] = window_mask*np.cos(2*np.pi*(k*scaling_ind+start_bin)*s/n_fft)
     elif freq_scale == 'log':
         start_bin = start_freq*n_fft/sr
         scaling_ind = np.log(end_freq/start_freq)/freq_bins
